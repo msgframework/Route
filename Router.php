@@ -2,6 +2,7 @@
 
 namespace RocketCMS\Lib\Router;
 
+use http\Exception\RuntimeException;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -12,22 +13,23 @@ use Msgframework\Lib\Registry\Registry;
 class Router
 {
     protected $application = null;
-    protected $map = null;
-    protected $instances = array();
-    protected $base = array();
-    protected $root = array();
-    protected static $current;
-    protected $friendly = false;
+    protected RouteMap $map;
+    protected array $instances = array();
+    protected array $base = array();
+    protected array $root = array();
+    protected Route $current;
+    protected bool $friendly = false;
+    protected Request $request;
 
     /**
      * @var string Can be used to ignore leading part of the Request URL (if main file lives in subdirectory of host)
      */
-    protected $basePath = '';
+    protected string $basePath = '';
 
     /**
      * @var array Array of default match types (regex helpers)
      */
-    protected $matchTypes = array(
+    protected array $matchTypes = array(
         'int' => '[0-9]++',
         'str' => '[0-9A-Za-z]++',
         'uuid4' => '[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12}',
@@ -37,12 +39,12 @@ class Router
         '' => '[^/\.]++'
     );
 
-    public function __construct($application)
+    public function __construct($application, Request $request)
     {
         $this->application = $application;
+        $this->request = $request;
         $config = $this->application->getConfig();
         $this->friendly = $config->get('friendly_url', false);
-        $uri = $this->getInstance();
 
         if ($this->friendly) {
             $this->setBasePath($config->get('base_url', ''));
@@ -50,8 +52,7 @@ class Router
             $type = $config->get('route_type', 'simple');
 
             $this->buildRules($type);
-        }
-        else {
+        } else {
             $routes = explode('/', $_GET['route']);
             $_SERVER['REDIRECT_URL'] = $_GET['route'];
 
@@ -65,31 +66,45 @@ class Router
 
     public function __get($name)
     {
-        switch ($name) {
-            case "vars":
-                return self::current()->getVars();
+        $method = "get" . ucfirst($name);
 
-            case "params":
-                return self::current()->getParams();
+        if(!isset($this->$name)) {
+            throw new RuntimeException(sprintf('Property %s can not be read from this Extension', $name));
         }
+
+        if(!\is_callable(array($this, $method))) {
+            throw new RuntimeException(sprintf('Method %s can\'t be call from this Extension', $method));
+        }
+
+        return $this->$method();
     }
 
-    public static function getComponent()
+    public function getVars()
     {
-        return self::$current->getComponent();
+        return $this->current()->getVars();
     }
 
-    public static function getController()
+    public function getParams()
     {
-        return self::$current->getController();
+        return $this->current()->getParams();
     }
 
-    public static function getAction()
+    public function getComponent()
     {
-        return self::$current->getAction();
+        return $this->current->getComponent();
     }
 
-    public function match(Request $request) : Route
+    public function getController()
+    {
+        return $this->current->getController();
+    }
+
+    public function getAction()
+    {
+        return $this->current->getAction();
+    }
+
+    public function match(Request $request): Route
     {
         $vars = array();
         $uri = $this->getInstance();
@@ -100,8 +115,7 @@ class Router
         // strip base path from request url
         $requestUrl = trim(substr($requestUrl, strlen($this->basePath)), '/');
 
-        if ($requestUrl == "")
-        {
+        if ($requestUrl == "") {
             $requestUrl = '/';
         }
 
@@ -114,12 +128,10 @@ class Router
                 // @ regex delimiter
                 $pattern = '`' . substr($route->getPath(), 1) . '`u';
                 $match = preg_match($pattern, $requestUrl, $vars) === 1;
-            }
-            elseif (($position = strpos($route->getPath(), '[')) === false) {
+            } elseif (($position = strpos($route->getPath(), '[')) === false) {
                 // No params in url, do string comparison
                 $match = strcmp($requestUrl, $route->getPath()) === 0;
-            }
-            else {
+            } else {
                 // Compare longest non-param string with url
                 if (strncmp($requestUrl, $route->getPath(), $position) !== 0) {
                     continue;
@@ -136,8 +148,7 @@ class Router
                     foreach ($vars as $key => $value) {
                         if (is_numeric($key)) {
                             unset($vars[$key]);
-                        }
-                        else {
+                        } else {
                             $tmp_vars->set($key, $value);
                         }
                     }
@@ -147,7 +158,7 @@ class Router
 
                 $match_route->setVars($tmp_vars);
 
-                self::$current = $match_route;
+                $this->current = $match_route;
                 return $match_route;
             }
         }
@@ -155,13 +166,13 @@ class Router
         throw new HttpException(404);
     }
 
-    private function buildRules($type = 'simple')
+    private function buildRules($type = 'simple'): void
     {
         $app = $this->application;
         $this->map = new RouteMap();
         switch ($type) {
             case 'db':
-                $menu = new RouterMenu($app->getId());
+                $menu = new RouterMenu($app->getId(), $this->container);
                 $components = $app->getExtensions('component');
 
                 foreach ($components as &$component) {
@@ -198,8 +209,7 @@ class Router
                                         if ($tmp_route->getParams()->get('pagination', false) && $route->isMenu()) {
                                             $tmp_route->setMenu($route->getMenu());
                                         }
-                                    }
-                                    elseif ($route->getAction() == $new_route->getAction()) {
+                                    } elseif ($route->getAction() == $new_route->getAction()) {
                                         $tmp_route->setPath(ltrim("{$route->getPath()}"));
 
                                         $tmp_route->setMenu($route->getMenu());
@@ -216,8 +226,7 @@ class Router
 
                                     $this->map->set($tmp_route);
                                 }
-                            }
-                            else {
+                            } else {
                                 foreach ($menu->getRoutes($new_route->getId()) as $menu_route) {
                                     $tmp_route = clone $new_route;
 
@@ -232,8 +241,7 @@ class Router
                                     $tmp->merge($menu_route->params);
                                     $tmp_route->setParams($tmp);
 
-                                    if($menu_route->home)
-                                    {
+                                    if ($menu_route->home) {
                                         $tmp_route->setHome();
                                     }
 
@@ -253,7 +261,7 @@ class Router
 
                 break;
             case 'map':
-                $path = ROOT_DIR . '/' . $app->getName() . "/config/route.map";
+                $path = $app->getDir() . "/config/route.map";
                 $map = array();
 
                 if (!empty($path) or file_exists($path)) {
@@ -274,7 +282,7 @@ class Router
                 //print_r($this->map);
                 break;
             case 'simple':
-                return false;
+                return;
             default:
                 break;
         }
@@ -290,12 +298,10 @@ class Router
     public function buildRoute(UuidInterface $id, $routeVars = null, bool $ajax = false)
     {
         $uri = new Url($this->root());
+        $url_parts = array('scheme', 'user', 'pass', 'host', 'port', 'path', 'query', 'fragment');
 
         if ($ajax) {
             $url_parts = array('path', 'query', 'fragment');
-        }
-        else {
-            $url_parts = array('scheme', 'user', 'pass', 'host', 'port', 'path', 'query', 'fragment');
         }
 
         if ($this->friendly) {
@@ -328,11 +334,9 @@ class Router
                     foreach ($routeVars as $key => $value) {
                         if (is_numeric($key) || is_object($value) || $value === null) {
                             continue;
-                        }
-                        elseif (isset($vars[$key]) && $vars[$key] !== $value) {
+                        } elseif (isset($vars[$key]) && $vars[$key] !== $value) {
                             continue 2;
-                        }
-                        elseif (isset($vars[$key])) {
+                        } elseif (isset($vars[$key])) {
                             continue;
                         }
                     }
@@ -343,8 +347,7 @@ class Router
                         $weight = $current_weight;
                         $current = $route;
                     }
-                }
-                else {
+                } else {
                     if (!$weight) {
                         $weight = 1;
                         $current = $route;
@@ -372,12 +375,10 @@ class Router
                             // Part is found, replace for param value
                             $url = str_replace($block, $routeVars[$var], $url);
                             unset($routeVars[$var]);
-                        }
-                        elseif ($optional && $index !== 0) {
+                        } elseif ($optional && $index !== 0) {
                             // Only strip preceeding slash if it's not at the base
                             $url = str_replace($pre . $block, '', $url);
-                        }
-                        else {
+                        } else {
                             // Strip match block
                             $url = str_replace($block, '', $url);
                         }
@@ -400,8 +401,7 @@ class Router
             $uri->set('path', $this->basePath);
 
             return $uri->getUrl($url_parts);
-        }
-        else {
+        } else {
             $routeVars = (array)$routeVars;
             $fragment = isset($routeVars['#']) ? '#' . $routeVars['#'] : '';
             unset($routeVars['#']);
@@ -425,13 +425,11 @@ class Router
                 // Determine if the request was over SSL (HTTPS).
                 if (isset($_SERVER['HTTPS']) && !empty($_SERVER['HTTPS']) && (strtolower($_SERVER['HTTPS']) != 'off')) {
                     $https = 's://';
-                }
-                elseif ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
+                } elseif ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
                     !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
                     (strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) !== 'http'))) {
                     $https = 's://';
-                }
-                else {
+                } else {
                     $https = '://';
                 }
 
@@ -445,8 +443,7 @@ class Router
                     // To build the entire URI we need to prepend the protocol, and the http host
                     // to the URI string.
                     $theURI = 'http' . $https . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-                }
-                else {
+                } else {
                     /*
                      * Since we do not have REQUEST_URI to work with, we will assume we are
                      * running on IIS and will therefore need to work some magic with the SCRIPT_NAME and
@@ -464,8 +461,7 @@ class Router
 
                 // Extra cleanup to remove invalid chars in the URL to prevent injections through the Host header
                 $theURI = str_replace(array("'", '"', '<', '>'), array('%27', '%22', '%3C', '%3E'), $theURI);
-            }
-            else {
+            } else {
                 // We were given a URI
                 $theURI = $uri;
             }
@@ -483,7 +479,7 @@ class Router
             $config = $app->getConfig();
             $uri = $this->getInstance();
 
-            $request = \Cms::getRequest();
+            $request = $this->request;
 
             $base_site = ($request->isSecure()) ? str_replace('http://', 'https://', $config->get('base_site', false)) : $config->get('base_site', false);
 
@@ -493,16 +489,14 @@ class Router
                 if ($config->get('base_url', false)) {
                     $uri->path->add($config->get('base_url'));
                 }
-            }
-            else {
+            } else {
                 if (strpos(php_sapi_name(), 'cgi') !== false && !ini_get('cgi.fix_pathinfo') && !empty($_SERVER['REQUEST_URI'])) {
                     // PHP-CGI on Apache with "cgi.fix_pathinfo = 0"
 
                     // We shouldn't have user-supplied PATH_INFO in PHP_SELF in this case
                     // because PHP will not work with PATH_INFO at all.
                     $script_name = $_SERVER['PHP_SELF'];
-                }
-                else {
+                } else {
                     // Others
                     $script_name = $_SERVER['SCRIPT_NAME'];
                 }
@@ -520,8 +514,7 @@ class Router
 
         if ($pathonly === false) {
             return $this->base->getUrl(array('scheme', 'host', 'port', 'path'));
-        }
-        else {
+        } else {
             return $this->base->getUrl(array('path'));
         }
     }
@@ -536,12 +529,12 @@ class Router
         return $this->root;
     }
 
-    public function current() : Route
+    public function current(): Route
     {
-        return self::$current;
+        return $this->current;
     }
 
-    public static function setError() : void
+    public function setError(): void
     {
         $target = new \stdClass();
         $target->component = 'errors';
@@ -550,12 +543,12 @@ class Router
         $target->vars = new Registry();
         $target->params = new Registry();
 
-        $component = \Cms::getApplication()->getExtensionByName('component', 'errors');
+        $component = $this->application->getExtensionByName('component', 'errors');
 
-        self::$current = new Route($component, ['GET', 'POST'], '', $target);
+        $this->current = new Route($component, ['GET', 'POST'], '', $target);
     }
 
-    public static function setOffline() : void
+    public function setOffline(): void
     {
         $target = new \stdClass();
         $target->component = 'offline';
@@ -564,14 +557,14 @@ class Router
         $target->vars = new Registry();
         $target->params = new Registry();
 
-        $component = \Cms::getApplication()->getExtensionByName('component', 'errors');
+        $component = $this->application->getExtensionByName('component', 'errors');
 
-        self::$current = new Route($component, ['GET', 'POST'], '', $target);
+        $this->current = new Route($component, ['GET', 'POST'], '', $target);
     }
 
     public function getLang()
     {
-        return false;
+        return 'ru';
     }
 
     /**
@@ -586,7 +579,7 @@ class Router
     /**
      * Compile the regex for a given route (EXPENSIVE)
      */
-    private function compileRoute($route)
+    private function compileRoute($route): string
     {
         if (preg_match_all('`(/|\.|)\[([^:\]]*+)(?::([^:\]]*+))?\](\?|)`', $route, $matches, PREG_SET_ORDER)) {
 
