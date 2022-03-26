@@ -12,7 +12,7 @@ use Msgframework\Lib\Registry\Registry;
 class Router
 {
     protected $application = null;
-    protected RouteMap $map;
+    protected RouteMap $routeMap;
     protected array $instances = array();
     protected array $base = array();
     protected array $root = array();
@@ -38,19 +38,16 @@ class Router
         '' => '[^/\.]++'
     );
 
-    public function __construct($application, Request $request)
+    public function __construct($application, Request $request, RouteMap $routeMap)
     {
         $this->application = $application;
         $this->request = $request;
+        $this->routeMap = $routeMap;
         $config = $this->application->getConfig();
         $this->friendly = $config->get('friendly_url', false);
 
         if ($this->friendly) {
             $this->setBasePath($config->get('base_url', ''));
-
-            $type = $config->get('route_type', 'simple');
-
-            $this->buildRules($type);
         } else {
             $routes = explode('/', $_GET['route']);
             $_SERVER['REDIRECT_URL'] = $_GET['route'];
@@ -118,7 +115,7 @@ class Router
             $requestUrl = '/';
         }
 
-        foreach ($this->map as $route) {
+        foreach ($this->routeMap as $route) {
             if (!in_array($requestMethod, $route->getMethods())) {
                 continue;
             }
@@ -163,128 +160,6 @@ class Router
         }
 
         throw new HttpException(404);
-    }
-
-    private function buildRules($type = 'simple'): void
-    {
-        $app = $this->application;
-        $this->map = new RouteMap();
-        switch ($type) {
-            case 'db':
-                $menu = new RouterMenu($app->getId(), $this->container);
-                $components = $app->getExtensions('component');
-
-                foreach ($components as &$component) {
-                    if (!$component->status) {
-                        continue;
-                    }
-
-                    $className = ucfirst(strtolower($component->name)) . 'Route';
-
-                    if (!class_exists($className)) {
-                        $path = $app->getDir() . '/components/' . $component->name . '/router.php';
-
-                        if (file_exists($path)) {
-                            require_once $path;
-                        }
-                    }
-
-                    if (class_exists($className)) {
-                        $component->router = new $className($component);
-
-                        foreach ($component->router->getRoutes() as $component_route) {
-                            $new_route = new Route($component, $component_route->methods, $component_route->path, $component_route);
-
-                            if (isset($component_route->parent)) {
-                                $parent_route = new Route($component, $component_route->parent->methods, $component_route->parent->path, $component_route->parent);
-                                $componentRoutes = $this->map->getRoutes($parent_route->getId());
-
-                                foreach ($componentRoutes as $route) {
-                                    $tmp_route = clone $new_route;
-
-                                    if ($component_route->parent->action == $route->getAction()) {
-                                        $tmp_route->setPath(ltrim("{$route->getPath()}/{$component_route->path}", "/"));
-
-                                        if ($tmp_route->getParams()->get('pagination', false) && $route->isMenu()) {
-                                            $tmp_route->setMenu($route->getMenu());
-                                        }
-                                    } elseif ($route->getAction() == $new_route->getAction()) {
-                                        $tmp_route->setPath(ltrim("{$route->getPath()}"));
-
-                                        $tmp_route->setMenu($route->getMenu());
-                                    }
-
-                                    $tmp = $new_route->getParams();
-                                    $tmp->merge($route->getParams());
-                                    $tmp_route->setParams($tmp);
-
-                                    $tmp = $new_route->getVars();
-                                    $tmp->merge($route->getVars());
-                                    $tmp->remove('page');
-                                    $tmp_route->setVars($tmp);
-
-                                    $this->map->set($tmp_route);
-                                }
-                            } else {
-                                foreach ($menu->getRoutes($new_route->getId()) as $menu_route) {
-                                    $tmp_route = clone $new_route;
-
-                                    $tmp_route->setPath($menu_route->path);
-                                    $tmp_route->setMenu($menu_route);
-
-                                    $tmp = $new_route->getVars();
-                                    $tmp->merge(new Registry($menu_route->vars));
-                                    $tmp_route->setVars($tmp);
-
-                                    $tmp = $new_route->getParams();
-                                    $tmp->merge($menu_route->params);
-                                    $tmp_route->setParams($tmp);
-
-                                    if ($menu_route->home) {
-                                        $tmp_route->setHome();
-                                    }
-
-                                    $this->map->set($tmp_route);
-                                }
-
-                                $tmp = clone $new_route;
-                                $tmp->setPath("components/{$component->name}/{$new_route->getPath()}");
-
-                                $this->map->set($tmp);
-                            }
-                        }
-                    }
-                }
-
-                //print_r($this->map);
-
-                break;
-            case 'map':
-                $path = $app->getDir() . "/config/route.map";
-                $map = array();
-
-                if (!empty($path) or file_exists($path)) {
-                    $map = json_decode(file_get_contents($path));
-                    if (json_last_error() !== JSON_ERROR_NONE or empty($map)) {
-                        $map = array();
-                    }
-                }
-
-                foreach ($map as $method => $routes) {
-                    foreach ($routes as $path => $item) {
-                        $new_route = new Route(array($method), $path, $item);
-
-                        $this->map->set($new_route);
-                    }
-                }
-
-                //print_r($this->map);
-                break;
-            case 'simple':
-                return;
-            default:
-                break;
-        }
     }
 
     public function create(string $component, string $controller, string $action = 'index', $routeVars = null, bool $ajax = false)
