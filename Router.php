@@ -14,8 +14,8 @@ class Router
     protected $application = null;
     protected RouteMap $routeMap;
     protected array $instances = array();
-    protected array $base = array();
-    protected array $root = array();
+    protected Url $base;
+    protected Url $root;
     protected Route $current;
     protected bool $friendly = false;
     protected Request $request;
