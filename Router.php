@@ -181,7 +181,7 @@ class Router
         if ($this->friendly) {
             $weight = 0;
 
-            if (!$this->map->hasRoute($id)) {
+            if (!$this->routeMap->hasRoute($id)) {
                 return false;
             }
 
@@ -189,7 +189,7 @@ class Router
                 $routeVars = $routeVars->toArray();
             }
 
-            $routes = $this->map->getRoutes($id);
+            $routes = $this->routeMap->getRoutes($id);
 
             $current = $routes[0];
 
