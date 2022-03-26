@@ -17,9 +17,9 @@
     "php": ">=7.4",
     "ramsey/uuid": "^4.2",
     "msgframework/registry": "^1.0",
-    "symfony/http-kernel": "^6.0",
     "jwage/purl": "^0.0.9",
     "msgframework/extension": "^1.0",
-    "ext-json": "*"
+    "ext-json": "*",
+    "symfony/http-kernel": "^5.4"
   }
 }
