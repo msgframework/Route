@@ -1,8 +1,7 @@
 <?php
 
-namespace RocketCMS\Lib\Router;
+namespace Msgframework\Lib\Route;
 
-use http\Exception\RuntimeException;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -69,11 +68,11 @@ class Router
         $method = "get" . ucfirst($name);
 
         if(!isset($this->$name)) {
-            throw new RuntimeException(sprintf('Property %s can not be read from this Extension', $name));
+            throw new \RuntimeException(sprintf('Property %s can not be read from this Extension', $name));
         }
 
         if(!\is_callable(array($this, $method))) {
-            throw new RuntimeException(sprintf('Method %s can\'t be call from this Extension', $method));
+            throw new \RuntimeException(sprintf('Method %s can\'t be call from this Extension', $method));
         }
 
         return $this->$method();

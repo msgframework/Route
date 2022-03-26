@@ -1,6 +1,6 @@
 <?php
 
-namespace RocketCMS\Lib\Router;
+namespace Msgframework\Lib\Route;
 use Joomla\Database\ParameterType;
 use Msgframework\Lib\Registry\Registry;
 
