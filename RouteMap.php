@@ -73,7 +73,7 @@ class RouteMap implements \IteratorAggregate, \ArrayAccess, \Countable
     {
         $routes = array();
 
-        if (!self::hasRoute($id))
+        if (!$this->hasRoute($id))
         {
             return array();
         }
