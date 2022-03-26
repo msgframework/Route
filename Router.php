@@ -346,7 +346,7 @@ class Router
         return $this->instances[$uri];
     }
 
-    public function base($pathonly = false)
+    public function base(bool $pathonly = false): string
     {
         $app = $this->application;
         if (empty($this->base)) {
@@ -393,14 +393,13 @@ class Router
         }
     }
 
-    public function root()
+    public function root(): string
     {
         if (empty($this->root)) {
-            $uri = $this->getInstance(self::base());
-            $this->root = $uri->getUrl(array('scheme', 'host', 'port'));
+            $this->root = $this->getInstance(self::base());
         }
 
-        return $this->root;
+        return $this->root->getUrl(array('scheme', 'host', 'port'));
     }
 
     public function current(): Route
