@@ -68,16 +68,16 @@
         },
         {
             "name": "msgframework/extension",
-            "version": "v1.0.0",
+            "version": "v1.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/msgframework/Extension.git",
-                "reference": "650313620db79d7a45f990afbb790d8a330dea5b"
+                "reference": "ce9675c228586204ddc3810df511bd275e6a2a82"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/msgframework/Extension/zipball/650313620db79d7a45f990afbb790d8a330dea5b",
-                "reference": "650313620db79d7a45f990afbb790d8a330dea5b",
+                "url": "https://api.github.com/repos/msgframework/Extension/zipball/ce9675c228586204ddc3810df511bd275e6a2a82",
+                "reference": "ce9675c228586204ddc3810df511bd275e6a2a82",
                 "shasum": ""
             },
             "require": {
@@ -104,9 +104,9 @@
             "description": "description",
             "support": {
                 "issues": "https://github.com/msgframework/Extension/issues",
-                "source": "https://github.com/msgframework/Extension/tree/v1.0.0"
+                "source": "https://github.com/msgframework/Extension/tree/v1.0.2"
             },
-            "time": "2022-03-25T19:52:51+00:00"
+            "time": "2022-04-03T11:01:57+00:00"
         },
         {
             "name": "msgframework/purl",

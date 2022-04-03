@@ -2,7 +2,7 @@
 
 namespace Msgframework\Lib\Route;
 
-use Msgframework\Lib\Extension\ExtensionInterface;
+use Msgframework\Lib\Extension\ExtensionAwareInterface;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Msgframework\Lib\Registry\Registry;
@@ -10,7 +10,7 @@ use Msgframework\Lib\Registry\Registry;
 class Route
 {
     protected UuidInterface $id;
-    protected ExtensionInterface $component;
+    protected ExtensionAwareInterface $component;
     protected string $controller;
     protected string $action;
     protected bool $home = false;
@@ -30,7 +30,7 @@ class Route
         'DELETE'
     );
 
-    public function __construct(ExtensionInterface $component, array $methods, $path, $target)
+    public function __construct(ExtensionAwareInterface $component, array $methods, $path, $target)
     {
         foreach ($methods as $method)
         {
@@ -81,7 +81,7 @@ class Route
         return $this->home == true;
     }
 
-    public function getComponent(): ExtensionInterface
+    public function getComponent(): ExtensionAwareInterface
     {
         return $this->component;
     }
