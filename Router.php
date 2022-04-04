@@ -103,9 +103,8 @@ class Router
     public function match(Request $request): Route
     {
         $vars = array();
-        $uri = $this->getInstance();
 
-        $requestUrl = $request->getRequestUri();
+        $requestUrl = $request->getPathInfo();
         $requestMethod = $request->getMethod();
 
         // strip base path from request url
@@ -150,7 +149,7 @@ class Router
                     }
                 }
 //TODO Нужно исправить занесение переменных в vars
-                $tmp_vars->merge(new Registry($uri->getQuery()->getData()));
+                $tmp_vars->merge(new Registry($request->query->all()));
 
                 $match_route->setVars($tmp_vars);
 
