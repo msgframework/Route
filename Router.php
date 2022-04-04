@@ -23,7 +23,7 @@ class Router
     /**
      * @var string Can be used to ignore leading part of the Request URL (if main file lives in subdirectory of host)
      */
-    protected string $basePath = '';
+    protected string $rootPath = '';
 
     /**
      * @var array Array of default match types (regex helpers)
@@ -108,7 +108,7 @@ class Router
         $requestMethod = $request->getMethod();
 
         // strip base path from request url
-        $requestUrl = trim(substr($requestUrl, strlen($this->basePath)), '/');
+        $requestUrl = trim(substr($requestUrl, strlen($this->rootPath)), '/');
 
         if ($requestUrl == "") {
             $requestUrl = '/';
@@ -234,7 +234,7 @@ class Router
                 }
 
                 $current->setPath(ltrim($current->getPath(), '/'));
-                $url = $this->basePath . $current->getPath();
+                $url = $this->rootPath . $current->getPath();
 
                 if (preg_match_all('`(/|\.|)\[([^:\]]*+)(?::([^:\]]*+))?\](\?|)`', $current->getPath(), $matches, PREG_SET_ORDER)) {
                     foreach ($matches as $index => $match) {
@@ -271,7 +271,7 @@ class Router
                 return $uri->getUrl($url_parts);
             }
 
-            $uri->set('path', $this->basePath);
+            $uri->set('path', $this->rootPath);
 
             return $uri->getUrl($url_parts);
         } else {
@@ -395,7 +395,7 @@ class Router
     public function root(): string
     {
         if (empty($this->root)) {
-            $this->root = $this->getInstance(self::base());
+            $this->root = $this->getInstance($this->rootPath);
         }
 
         return $this->root->getUrl(array('scheme', 'host', 'port'));
@@ -441,11 +441,12 @@ class Router
 
     /**
      * Set the base path.
-     * Useful if you are running your application from a subdirectory.
+     * Useful if you are running your application from a subdirectory in domain.
+     * Example: https://domain.com/subdirectory/index.php
      */
-    private function setBasePath($basePath)
+    private function setRootPath(string $rootPath)
     {
-        $this->basePath = (trim($basePath, '/') != '') ? trim($basePath, '/') . '/' : '';
+        $this->rootPath = (trim($rootPath, '/') != '') ? trim($rootPath, '/') . '/' : '';
     }
 
     /**
