@@ -46,9 +46,9 @@ class Router
         $config = $this->application->getConfig();
         $this->friendly = $config->get('friendly_url', false);
 
-        if ($this->friendly) {
-            $this->setBasePath($config->get('base_url', ''));
-        } else {
+        $this->setRootPath($this->config->get('root_path'));
+
+        if (!$this->friendly) {
             $routes = explode('/', $_GET['route']);
             $_SERVER['REDIRECT_URL'] = $_GET['route'];
 
