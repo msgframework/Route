@@ -2,6 +2,7 @@
 
 namespace Msgframework\Lib\Route;
 
+use Msgframework\Lib\Config\Config;
 use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -11,7 +12,7 @@ use Msgframework\Lib\Registry\Registry;
 
 class Router
 {
-    protected $application = null;
+    protected Config $config;
     protected RouteMap $routeMap;
     protected array $instances = array();
     protected Url $base;
@@ -38,13 +39,12 @@ class Router
         '' => '[^/\.]++'
     );
 
-    public function __construct($application, Request $request, RouteMap $routeMap)
+    public function __construct(Config $config, Request $request, RouteMap $routeMap)
     {
-        $this->application = $application;
+        $this->config = $config;
         $this->request = $request;
         $this->routeMap = $routeMap;
-        $config = $this->application->getConfig();
-        $this->friendly = $config->get('friendly_url', false);
+        $this->friendly = $this->config->get('friendly_url', false);
 
         $this->setRootPath($this->config->get('root_path'));
 
@@ -148,7 +148,7 @@ class Router
                         }
                     }
                 }
-//TODO Нужно исправить занесение переменных в vars
+
                 $tmp_vars->merge(new Registry($request->query->all()));
 
                 $match_route->setVars($tmp_vars);
@@ -347,10 +347,8 @@ class Router
 
     public function base(bool $pathonly = false): string
     {
-        $app = $this->application;
         if (empty($this->base)) {
-            $config = $app->getConfig();
-            $uri = $this->getInstance();
+            $config = $this->config;
 
             $request = $this->request;
 
@@ -376,6 +374,7 @@ class Router
 
                 // Extra cleanup to remove invalid chars in the URL to prevent injections through broken server implementation
                 $script_name = str_replace(array("'", '"', '<', '>'), array('%27', '%22', '%3C', '%3E'), $script_name);
+
 
                 $script_name = rtrim(dirname($script_name), '/\\');
 
