@@ -46,7 +46,7 @@ class Router
         $this->routeMap = $routeMap;
         $this->friendly = $this->config->get('friendly_url', false);
 
-        $this->setRootPath($this->config->get('root_path'));
+        $this->setRootPath($this->config->get('root_path', ''));
 
         if (!$this->friendly) {
             $routes = explode('/', $_GET['route']);
@@ -354,13 +354,14 @@ class Router
 
             $base_site = ($request->isSecure()) ? str_replace('http://', 'https://', $config->get('base_site', false)) : $config->get('base_site', false);
 
-            if (trim($base_site) != '') {
+            if (!empty(trim($base_site))) {
                 $uri = $this->getInstance($base_site);
 
-                if ($config->get('base_url', false)) {
-                    $uri->path->add($config->get('base_url'));
+                if ($config->get('base_uri', false)) {
+                    $uri->path->add($config->get('base_uri'));
                 }
             } else {
+                $uri = $this->getInstance();
                 if (strpos(php_sapi_name(), 'cgi') !== false && !ini_get('cgi.fix_pathinfo') && !empty($_SERVER['REQUEST_URI'])) {
                     // PHP-CGI on Apache with "cgi.fix_pathinfo = 0"
 
