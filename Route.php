@@ -19,6 +19,7 @@ class Route
     protected Registry $vars;
     protected Registry $params;
     protected array $methods = array();
+    protected Route $parent;
 
     /**
      * @var array Array of default methods types
@@ -30,7 +31,7 @@ class Route
         'DELETE'
     );
 
-    public function __construct(ExtensionAwareInterface $component, array $methods, $path, $target)
+    public function __construct(ExtensionAwareInterface $component, array $methods, $path, $target, ?Route $parent = null)
     {
         foreach ($methods as $method)
         {
@@ -38,6 +39,10 @@ class Route
             {
                 $this->methods[] = $method;
             }
+        }
+
+        if($parent instanceof Route) {
+            $this->setParent($parent);
         }
 
         $this->component = $component;
@@ -69,6 +74,21 @@ class Route
     public function isMenu(): bool
     {
         return isset($this->menu);
+    }
+
+    public function setParent(Route $parent)
+    {
+        $this->parent = $parent;
+    }
+
+    public function getParent()
+    {
+        return $this->parent ?? null;
+    }
+
+    public function hasParent(): bool
+    {
+        return isset($this->parent);
     }
 
     public function setHome()
