@@ -20,7 +20,8 @@
     "msgframework/extension": "^1.0",
     "ext-json": "*",
     "symfony/http-kernel": "^5.4",
-    "msgframework/purl": "^1.0",
-    "msgframework/config": "^1.0"
+    "msgframework/config": "^1.0",
+    "league/uri": "^6.5",
+    "league/uri-components": "^2.4"
   }
 }

@@ -7,7 +7,9 @@ use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\Request;
-use Purl\Url;
+use League\Uri\Components\Query;
+use League\Uri\Uri;
+use League\Uri\UriModifier;
 use Msgframework\Lib\Registry\Registry;
 
 class Router
@@ -15,8 +17,8 @@ class Router
     protected Config $config;
     protected RouteMap $routeMap;
     protected array $instances = array();
-    protected Url $base;
-    protected Url $root;
+    protected Uri $base;
+    protected Uri $root;
     protected Route $current;
     protected bool $friendly = false;
     protected Request $request;
@@ -109,12 +111,14 @@ class Router
 
         // strip base path from request url
         $requestUrl = trim(substr($requestUrl, strlen($this->rootPath)), '/');
+        $requestUrl = trim(substr($requestUrl, strlen($this->config->get('base_uri', ''))), '/');
 
         if ($requestUrl == "") {
             $requestUrl = '/';
         }
 
         foreach ($this->routeMap as $route) {
+            $match = 0;
             if (!in_array($requestMethod, $route->getMethods())) {
                 continue;
             }
@@ -170,12 +174,7 @@ class Router
 
     public function buildRoute(UuidInterface $id, $routeVars = null, bool $ajax = false)
     {
-        $uri = new Url($this->root());
-        $url_parts = array('scheme', 'user', 'pass', 'host', 'port', 'path', 'query', 'fragment');
-
-        if ($ajax) {
-            $url_parts = array('path', 'query', 'fragment');
-        }
+        $uri = Uri::createFromString($this->base());
 
         if ($this->friendly) {
             $weight = 0;
@@ -262,143 +261,93 @@ class Router
                     unset($routeVars[$var]);
                 }
 
-                $uri->set('path', $url . (($url != "") ? '/' : ''));
+                $uri = UriModifier::appendSegment($uri, $url);
 
                 if (isset($routeVars) && count($routeVars)) {
-                    $uri->query->setData($routeVars);
+                    $uri = UriModifier::appendQuery($uri, http_build_query($routeVars));
                 }
 
-                return $uri->getUrl($url_parts);
+                $uri = UriModifier::addTrailingSlash($uri);
+
+                return $uri->toString();
             }
 
-            $uri->set('path', $this->rootPath);
-
-            return $uri->getUrl($url_parts);
+            return $uri->toString();
         } else {
             $routeVars = (array)$routeVars;
             $fragment = isset($routeVars['#']) ? '#' . $routeVars['#'] : '';
             unset($routeVars['#']);
 
-            $uri->set('fragment', $fragment);
-            $uri->set('path', 'index.php');
+            $uri->withFragment($fragment);
 
-            $uri->set('query', $routeVars);
+            $uri = UriModifier::appendSegment($uri, 'index.php');
+            $uri = UriModifier::appendQuery($uri, http_build_query($routeVars));
 
-            return $uri->getUrl($url_parts);
+            return $uri->toString();
         }
 
-        return $uri->getUrl($url_parts);
-    }
-
-    public function getInstance($uri = 'SERVER')
-    {
-        if (empty($this->instances[$uri])) {
-            // Are we obtaining the URI from the server?
-            if ($uri == 'SERVER') {
-                // Determine if the request was over SSL (HTTPS).
-                if (isset($_SERVER['HTTPS']) && !empty($_SERVER['HTTPS']) && (strtolower($_SERVER['HTTPS']) != 'off')) {
-                    $https = 's://';
-                } elseif ((isset($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
-                    !empty($_SERVER['HTTP_X_FORWARDED_PROTO']) &&
-                    (strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) !== 'http'))) {
-                    $https = 's://';
-                } else {
-                    $https = '://';
-                }
-
-                /*
-                 * Since we are assigning the URI from the server variables, we first need
-                 * to determine if we are running on apache or IIS.  If PHP_SELF and REQUEST_URI
-                 * are present, we will assume we are running on apache.
-                 */
-
-                if (!empty($_SERVER['PHP_SELF']) && !empty($_SERVER['REQUEST_URI'])) {
-                    // To build the entire URI we need to prepend the protocol, and the http host
-                    // to the URI string.
-                    $theURI = 'http' . $https . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-                } else {
-                    /*
-                     * Since we do not have REQUEST_URI to work with, we will assume we are
-                     * running on IIS and will therefore need to work some magic with the SCRIPT_NAME and
-                     * QUERY_STRING environment variables.
-                     *
-                     * IIS uses the SCRIPT_NAME variable instead of a REQUEST_URI variable... thanks, MS
-                     */
-                    $theURI = 'http' . $https . $_SERVER['HTTP_HOST'] . $_SERVER['SCRIPT_NAME'];
-
-                    // If the query string exists append it to the URI string
-                    if (isset($_SERVER['QUERY_STRING']) && !empty($_SERVER['QUERY_STRING'])) {
-                        $theURI .= '?' . $_SERVER['QUERY_STRING'];
-                    }
-                }
-
-                // Extra cleanup to remove invalid chars in the URL to prevent injections through the Host header
-                $theURI = str_replace(array("'", '"', '<', '>'), array('%27', '%22', '%3C', '%3E'), $theURI);
-            } else {
-                // We were given a URI
-                $theURI = $uri;
-            }
-
-            $this->instances[$uri] = new Url($theURI);
-        }
-
-        return $this->instances[$uri];
+        return $uri->toString();
     }
 
     public function base(bool $pathonly = false): string
     {
-        if (empty($this->base)) {
+        if (!isset($this->base)) {
+            $this->base = Uri::createFromBaseUri('', $this->root);
             $config = $this->config;
-
             $request = $this->request;
 
-            $base_site = ($request->isSecure()) ? str_replace('http://', 'https://', $config->get('base_site', false)) : $config->get('base_site', false);
+            if (strpos(php_sapi_name(), 'cgi') !== false && !ini_get('cgi.fix_pathinfo') && !empty($_SERVER['REQUEST_URI'])) {
+                // PHP-CGI on Apache with "cgi.fix_pathinfo = 0"
 
-            if (!empty(trim($base_site))) {
-                $uri = $this->getInstance($base_site);
-
-                if ($config->get('base_uri', false)) {
-                    $uri->path->add($config->get('base_uri'));
-                }
+                // We shouldn't have user-supplied PATH_INFO in PHP_SELF in this case
+                // because PHP will not work with PATH_INFO at all.
+                $script_name = $_SERVER['PHP_SELF'];
             } else {
-                $uri = $this->getInstance();
-                if (strpos(php_sapi_name(), 'cgi') !== false && !ini_get('cgi.fix_pathinfo') && !empty($_SERVER['REQUEST_URI'])) {
-                    // PHP-CGI on Apache with "cgi.fix_pathinfo = 0"
-
-                    // We shouldn't have user-supplied PATH_INFO in PHP_SELF in this case
-                    // because PHP will not work with PATH_INFO at all.
-                    $script_name = $_SERVER['PHP_SELF'];
-                } else {
-                    // Others
-                    $script_name = $_SERVER['SCRIPT_NAME'];
-                }
-
-                // Extra cleanup to remove invalid chars in the URL to prevent injections through broken server implementation
-                $script_name = str_replace(array("'", '"', '<', '>'), array('%27', '%22', '%3C', '%3E'), $script_name);
-
-
-                $script_name = rtrim(dirname($script_name), '/\\');
-
-                $uri->set('path', $script_name . (($script_name != "") ? '/' : ''));
+                // Others
+                $script_name = $_SERVER['SCRIPT_NAME'];
             }
 
-            $this->base = $uri;
+            // Extra cleanup to remove invalid chars in the URL to prevent injections through broken server implementation
+            $script_name = str_replace(array("'", '"', '<', '>'), array('%27', '%22', '%3C', '%3E'), $script_name);
+
+            $script_name = rtrim(dirname($script_name), '/\\');
+
+            if(!empty($script_name)) {
+                $this->base = UriModifier::appendSegment($this->base, $script_name);
+            }
+
+            if ($config->get('base_uri', false)) {
+                $this->base = UriModifier::appendSegment($this->base, $config->get('base_uri'));
+            }
+            $this->base = UriModifier::addTrailingSlash($this->base);
         }
 
         if ($pathonly === false) {
-            return $this->base->getUrl(array('scheme', 'host', 'port', 'path'));
+            return $this->base->toString();
         } else {
-            return $this->base->getUrl(array('path'));
+            return $this->base->getPath();
         }
     }
 
     public function root(): string
     {
-        if (empty($this->root)) {
-            $this->root = $this->getInstance($this->rootPath);
+        if (!isset($this->root)) {
+            $config = $this->config;
+            $request = $this->request;
+
+            $scheme = $request->isSecure() ? 'https' : 'http';
+            $host   = $config->exists('domain') ? $config->get('domain') : $_SERVER['HTTP_HOST'];
+            $baseUrl = sprintf('%s://%s', $scheme, $host);
+
+            $this->root = Uri::createFromString($baseUrl);
+
+            if($config->exists('root_path')) {
+                $this->root = UriModifier::appendSegment($this->root, $config->get('root_path'));
+            }
+            $this->root = UriModifier::addTrailingSlash($this->root);
         }
 
-        return $this->root->getUrl(array('scheme', 'host', 'port'));
+        return $this->root->toString();
     }
 
     public function current(): Route
