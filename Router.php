@@ -33,7 +33,7 @@ class Router
      */
     protected array $matchTypes = array(
         'int' => '[0-9]++',
-        'str' => '[0-9A-Za-z]++',
+        'str' => '[0-9A-Za-z\-]++',
         'uuid4' => '[0-9a-f]{8}\-[0-9a-f]{4}\-4[0-9a-f]{3}\-[89ab][0-9a-f]{3}\-[0-9a-f]{12}',
         'h' => '[0-9A-Fa-f]++',
         '*' => '.+?',
