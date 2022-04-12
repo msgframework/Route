@@ -156,8 +156,10 @@ class Router
                 $tmp_vars->merge(new Registry($request->query->all()));
 
                 $match_route->setVars($tmp_vars);
+                $request->query->add($tmp_vars->toArray());
 
                 $this->current = $match_route;
+
                 return $match_route;
             }
         }
@@ -285,8 +287,6 @@ class Router
 
             return $uri->toString();
         }
-
-        return $uri->toString();
     }
 
     public function base(bool $pathonly = false): string
