@@ -11,15 +11,12 @@ class Route
 {
     protected UuidInterface $id;
     protected ExtensionAwareInterface $component;
-    protected string $controller;
-    protected string $action;
-    protected bool $home = false;
-    protected $menu;
+    protected TargetInterface $target;
     protected string $path = "";
-    protected Registry $vars;
-    protected Registry $params;
+    public Registry $vars;
     protected array $methods = array();
     protected Route $parent;
+    protected bool $home = false;
 
     /**
      * @var array Array of default methods types
@@ -31,29 +28,20 @@ class Route
         'DELETE'
     );
 
-    public function __construct(ExtensionAwareInterface $component, array $methods, $path, $target, ?Route $parent = null)
+    public function __construct(ExtensionAwareInterface $component, array $methods, $path, TargetInterface $target, $vars, ?Route $parent = null)
     {
-        foreach ($methods as $method)
-        {
-            if(in_array($method, $this->methodsTypes))
-            {
-                $this->methods[] = $method;
-            }
-        }
+        $this->methods = array_intersect($methods, $this->methodsTypes);
 
         if($parent instanceof Route) {
             $this->setParent($parent);
         }
 
         $this->component = $component;
-        $this->controller = $target->controller;
-        $this->action = $target->action;
+        $this->target = $target;
 
-        $this->id = Uuid::uuid3(Uuid::NAMESPACE_OID, "route/{$this->component->getName()}/{$this->controller}/{$this->action}");
+        $this->id = Uuid::uuid3(Uuid::NAMESPACE_OID, "route/{$this->component->getName()}/{$this->target->getController()}/{$this->target->getAction()}");
         $this->path = ltrim($path, '/');
-
-        $this->vars = new Registry($target->vars);
-        $this->params = new Registry($target->params);
+        $this->vars = new Registry($vars);
     }
 
     public function getId(): UuidInterface
@@ -61,29 +49,18 @@ class Route
         return $this->id;
     }
 
-    public function setMenu($menu)
-    {
-        $this->menu = $menu;
-    }
-
-    public function getMenu()
-    {
-        return $this->menu;
-    }
-
-    public function isMenu(): bool
-    {
-        return isset($this->menu);
-    }
-
     public function setParent(Route $parent)
     {
         $this->parent = $parent;
     }
 
-    public function getParent()
+    public function getParent(): Route
     {
-        return $this->parent ?? null;
+        if(!isset($this->parent)) {
+            throw new \RuntimeException(sprintf('This Route has no parent: %s', $this->getId()));
+        }
+
+        return $this->parent;
     }
 
     public function hasParent(): bool
@@ -91,14 +68,19 @@ class Route
         return isset($this->parent);
     }
 
-    public function setHome()
+    public function setHome(bool $home)
     {
-        $this->home = true;
+        $this->home = $home;
     }
 
     public function isHome(): bool
     {
-        return $this->home == true;
+        return $this->home;
+    }
+
+    public function getVars(): Registry
+    {
+        return $this->vars;
     }
 
     public function getComponent(): ExtensionAwareInterface
@@ -106,14 +88,9 @@ class Route
         return $this->component;
     }
 
-    public function getController()
+    public function getTarget(): TargetInterface
     {
-        return $this->controller;
-    }
-
-    public function getAction()
-    {
-        return $this->action;
+        return $this->target;
     }
 
     public function setPath($path)
@@ -124,26 +101,6 @@ class Route
     public function getPath(): string
     {
         return $this->path;
-    }
-
-    public function getVars(): Registry
-    {
-        return clone $this->vars;
-    }
-
-    public function setVars($vars)
-    {
-        $this->vars = new Registry($vars);
-    }
-
-    public function getParams(): Registry
-    {
-        return clone $this->params;
-    }
-
-    public function setParams($params)
-    {
-        $this->params = new Registry($params);
     }
 
     public function getMethods(): array
@@ -170,6 +127,5 @@ class Route
     {
         $this->home = false;
         $this->vars = clone $this->vars;
-        $this->params = clone $this->params;
     }
 }

@@ -7,7 +7,6 @@ use Ramsey\Uuid\Uuid;
 use Ramsey\Uuid\UuidInterface;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpFoundation\Request;
-use League\Uri\Components\Query;
 use League\Uri\Uri;
 use League\Uri\UriModifier;
 use Msgframework\Lib\Registry\Registry;
@@ -77,31 +76,6 @@ class Router
         return $this->$method();
     }
 
-    public function getVars()
-    {
-        return $this->current()->getVars();
-    }
-
-    public function getParams()
-    {
-        return $this->current()->getParams();
-    }
-
-    public function getComponent()
-    {
-        return $this->current->getComponent();
-    }
-
-    public function getController()
-    {
-        return $this->current->getController();
-    }
-
-    public function getAction()
-    {
-        return $this->current->getAction();
-    }
-
     public function match(Request $request): Route
     {
         $vars = array();
@@ -141,7 +115,7 @@ class Router
 
             if ($match) {
                 $match_route = clone $route;
-                $tmp_vars = $match_route->getVars();
+                $tmp_vars = $match_route->vars;
 
                 if (count($vars)) {
                     foreach ($vars as $key => $value) {
@@ -259,7 +233,7 @@ class Router
                     }
                 }
 
-                foreach ($current->getVars() as $var => $var_val) {
+                foreach ($current->vars as $var => $var_val) {
                     unset($routeVars[$var]);
                 }
 
@@ -357,30 +331,12 @@ class Router
 
     public function setError(): void
     {
-        $target = new \stdClass();
-        $target->component = 'errors';
-        $target->controller = 'errors';
-        $target->action = 'index';
-        $target->vars = new Registry();
-        $target->params = new Registry();
+        $target = new Target('errors', 'index', new Registry(), array());
+        $vars = new Registry();
 
         $component = $this->application->getExtensionByName('component', 'errors');
 
-        $this->current = new Route($component, ['GET', 'POST'], '', $target);
-    }
-
-    public function setOffline(): void
-    {
-        $target = new \stdClass();
-        $target->component = 'offline';
-        $target->controller = 'offline';
-        $target->action = 'index';
-        $target->vars = new Registry();
-        $target->params = new Registry();
-
-        $component = $this->application->getExtensionByName('component', 'errors');
-
-        $this->current = new Route($component, ['GET', 'POST'], '', $target);
+        $this->current = new Route($component, ['GET', 'POST'], '', $target, $vars);
     }
 
     public function getLang()
