@@ -24,14 +24,19 @@ class Target implements TargetInterface
         $this->params = new Registry($params);
     }
 
+    public function getParams(): Registry
+    {
+        return $this->params;
+    }
+
     public function setMetadata($metadata): void
     {
         $this->metadata = new Registry($metadata);
     }
 
-    public function getParams(): Registry
+    public function getMetadata(): Registry
     {
-        return $this->params;
+        return $this->metadata;
     }
 
     public function getController(): string

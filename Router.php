@@ -129,7 +129,7 @@ class Router
 
                 $tmp_vars->merge(new Registry($request->query->all()));
 
-                $match_route->setVars($tmp_vars);
+                $match_route->vars = $tmp_vars;
                 $request->query->add($tmp_vars->toArray());
 
                 $this->current = $match_route;
