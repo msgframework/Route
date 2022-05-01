@@ -88,6 +88,11 @@ class Route
         return $this->component;
     }
 
+    public function setTarget(TargetInterface $target): void
+    {
+        $this->target = $target;
+    }
+
     public function getTarget(): TargetInterface
     {
         return $this->target;
